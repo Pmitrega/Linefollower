@@ -1,0 +1,28 @@
+#ifndef __SENSORS_H
+#define _SENSORS_H
+#include "main.h"
+#define SENSOR0_WHITE 3450
+#define SENSOR1_WHITE 3380
+#define SENSOR2_WHITE 3460
+#define SENSOR3_WHITE 3470  
+#define SENSOR4_WHITE 3440
+#define SENSOR5_WHITE 3410
+#define SENSOR6_WHITE 3410
+#define SENSOR7_WHITE 3360
+
+#define SENSOR0_BLACK 3620
+#define SENSOR1_BLACK 3590
+#define SENSOR2_BLACK 3640
+#define SENSOR3_BLACK 3640  
+#define SENSOR4_BLACK 3620
+#define SENSOR5_BLACK 3640
+#define SENSOR6_BLACK 3640
+#define SENSOR7_BLACK 3560
+
+#define HALF_ANGLE 23.0f
+#define DIFF_PER_SENSOR HALF_ANGLE/4
+
+#define SENSOR_THRE 70
+
+int estimate_angle(uint16_t* sensors);
+#endif

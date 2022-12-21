@@ -5,6 +5,8 @@
 extern UART_HandleTypeDef huart1;
 extern int16_t velocity_LEFT;
 extern int16_t velocity_RIGHT;
+int desired_velocity_left;
+int desired_velocity_right;
 int set_PWM(enum Motor mot, uint16_t value){
     if(value>1000){
         return -1;
@@ -132,7 +134,16 @@ void pid_right(int error, int point_of_work){
     float I = 1;
     set_control(MOTOR_RIGHT, base_value + error * P+ error_integral * I);
 }
-int set_velocity_pid(enum Motor mot, int desired_velocity){
-    if(mot == MOTOR_LEFT)pid_left(desired_velocity - velocity_LEFT, desired_velocity);
-    if(mot == MOTOR_RIGHT)pid_right(desired_velocity - velocity_RIGHT, desired_velocity);
+void velocity_pid(){
+    pid_left(desired_velocity_left - velocity_LEFT, desired_velocity_left);
+    pid_right(desired_velocity_right - velocity_RIGHT, desired_velocity_right);
+}
+
+void set_velocity(enum Motor mot, int desired_velocity){
+    if(mot == MOTOR_RIGHT){
+        desired_velocity_right = desired_velocity;
+    }
+    if(mot == MOTOR_LEFT){
+        desired_velocity_left = desired_velocity;
+    }
 }
