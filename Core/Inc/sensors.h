@@ -22,7 +22,8 @@
 #define HALF_ANGLE 23.0f
 #define DIFF_PER_SENSOR HALF_ANGLE/4
 
-#define SENSOR_THRE 70
+#define SENSOR_THRE 40
 
+#define BASE_SPEED_REMEMBER 110
 int estimate_angle(uint16_t* sensors);
 #endif

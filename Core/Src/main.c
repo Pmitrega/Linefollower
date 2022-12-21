@@ -33,6 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define P_velocity 17
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,6 +48,7 @@ DMA_HandleTypeDef hdma_adc1;
 
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim9;
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
@@ -56,6 +59,8 @@ UART_HandleTypeDef huart1;
 int velocity_LEFT;
 int velocity_RIGHT;
 extern uint16_t sensor_readings[8];
+int angle = 0;
+int BASE_SPEED = 160;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,6 +74,7 @@ static void MX_TIM4_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM9_Init(void);
+static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -83,6 +89,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     velocity_RIGHT =(int)((-(int16_t)last_enc_RIGHT + ENCODER_RIGHT)*CONVERSION_COEFFICIENT);
     last_enc_LEFT = ENCODER_LEFT;
     last_enc_RIGHT = ENCODER_RIGHT;
+  }
+  if(htim == &htim5){
+      angle = estimate_angle(sensor_readings);
+      set_velocity(MOTOR_LEFT,P_velocity*angle+BASE_SPEED);
+      set_velocity(MOTOR_RIGHT, -P_velocity*angle+BASE_SPEED);
+      velocity_pid();
   }
 }
 
@@ -142,6 +154,7 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_TIM9_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim9);
   HAL_TIM_PWM_Start(&htim10, TIM_CHANNEL_1);
@@ -162,20 +175,16 @@ int main(void)
         while(!HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin)){
 
       }
+  HAL_TIM_Base_Start_IT(&htim5);
   /* USER CODE END 2 */
-  
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {   
 
-      //l = sprintf(buffer, "%d %d %d %d %d %d %d %d\n",sensor_readings[0],sensor_readings[1],sensor_readings[2],sensor_readings[3],sensor_readings[4],sensor_readings[5],sensor_readings[6],sensor_readings[7]);
-      angle = estimate_angle(sensor_readings);
-      set_velocity(MOTOR_LEFT,P*angle+base_speed);
-      set_velocity(MOTOR_RIGHT, -P*angle+base_speed);
-      velocity_pid();
-
-      l = sprintf(buffer, "%d\n", angle);
+      l = sprintf(buffer, "%d %d %d %d %d %d %d %d\n",sensor_readings[0],sensor_readings[1],sensor_readings[2],sensor_readings[3],sensor_readings[4],sensor_readings[5],sensor_readings[6],sensor_readings[7]);
+      //l = sprintf(buffer, "%d\n", angle);
       HAL_UART_Transmit(&huart1, buffer, l, 100);
       HAL_Delay(10);
     /* USER CODE END WHILE */
@@ -429,6 +438,51 @@ static void MX_TIM4_Init(void)
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 1000;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 100;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+
+  /* USER CODE END TIM5_Init 2 */
 
 }
 
