@@ -51,8 +51,8 @@ TIM_HandleTypeDef htim11;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-int16_t velocity_LEFT;
-int16_t velocity_RIGHT;
+int velocity_LEFT;
+int velocity_RIGHT;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -75,11 +75,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   static uint16_t last_enc_LEFT = 32000;
   static uint16_t last_enc_RIGHT = 32000;
   if(htim == &htim9){
-    velocity_LEFT = (int16_t)last_enc_LEFT - ENCODER_LEFT;
-    velocity_RIGHT =  ENCODER_RIGHT - (int16_t)last_enc_RIGHT;
+    velocity_LEFT = (int)(((int16_t)last_enc_LEFT - ENCODER_LEFT)*CONVERSION_COEFFICIENT);
+    velocity_RIGHT =(int)((-(int16_t)last_enc_RIGHT + ENCODER_RIGHT)*CONVERSION_COEFFICIENT);
     last_enc_LEFT = ENCODER_LEFT;
     last_enc_RIGHT = ENCODER_RIGHT;
   }
+}
+
+void led_check(){
+  HAL_GPIO_WritePin(GPIOB, LED_RED1_Pin,1);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_BLUE1_Pin, 1);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_BLUE2_Pin, 1);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_RED2_Pin, 1);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_RED1_Pin,0);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_BLUE1_Pin, 0);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_BLUE2_Pin, 0);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOB, LED_RED2_Pin, 0);
 }
 
 /* USER CODE END 0 */
@@ -128,6 +146,10 @@ int main(void)
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
   HAL_GPIO_WritePin(STBY_GPIO_Port, STBY_Pin, 1);
+  HAL_GPIO_WritePin(STBY_GPIO_Port, STBY_Pin, 1);
+  led_check();
+  int l;
+  char buffer[20];
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -135,19 +157,17 @@ int main(void)
   while (1)
   {
     while(!HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin)){
-
     }
-    test_step_engine(MOTOR_LEFT);
-    //test_engine(MOTOR_RIGHT);
-    // HAL_GPIO_TogglePin(GPIOB, LED_BLUE1_Pin);
-    // HAL_Delay(500);
-    // set_direction(MOTOR_LEFT, FORWARD);
-    // set_PWM(MOTOR_LEFT, 800);
-    // HAL_Delay(3000);
-    // while(!HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin)){
-    // }
-    // set_PWM(MOTOR_LEFT, 0);
-    // HAL_Delay(300);
+    HAL_Delay(1000);
+    for(int i = 0; i <150; i++){
+    set_velocity_pid(MOTOR_LEFT, -200);
+    set_velocity_pid(MOTOR_RIGHT, 200);
+    l = sprintf(buffer, "%d %d \n",velocity_LEFT,velocity_RIGHT);
+    HAL_UART_Transmit(&huart1, buffer, l, 100);
+    HAL_Delay(10);
+    }
+    set_velocity_pid(MOTOR_LEFT, 0);
+    set_velocity_pid(MOTOR_RIGHT, 0);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -519,13 +539,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_ONBOARD_GPIO_Port, LED_ONBOARD_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, AIN1_Pin|AIN2_Pin|BIN1_Pin|BIN2_Pin
@@ -533,13 +549,6 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(STBY_GPIO_Port, STBY_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : LED_ONBOARD_Pin */
-  GPIO_InitStruct.Pin = LED_ONBOARD_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_ONBOARD_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : AIN1_Pin AIN2_Pin BIN1_Pin BIN2_Pin
                            LED_RED2_Pin LED_BLUE2_Pin LED_RED1_Pin LED_BLUE1_Pin */

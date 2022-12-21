@@ -59,24 +59,80 @@ void test_engine(enum Motor mot){
     set_PWM(mot, 0);
 }
 int calc_velocity(uint16_t last_enc_reading, uint16_t enc_reading);
-int set_velocity(enum Motor mot, uint16_t value){
+int set_control(enum Motor mot, int16_t value){
+    //SATURATION
+    if(value > 1000)
+        value = 1000;
+    if(value < -1000)
+        value = -1000;
+
+    if (value < 0)
+        set_direction(mot, BACKWARD);
+    else
+        set_direction(mot, FORWARD);
+    if(value < 0)
+        value = -value;
+    
+    set_PWM(mot, value);
 
 };
 
 void test_step_engine(enum Motor mot){
     uint16_t pwm_value = 1000;
-    static char buffer[20];
+    char buffer[20];
     int l;
     set_direction(mot, FORWARD);
     set_PWM(mot, pwm_value);
     set_direction(MOTOR_RIGHT, FORWARD);
     set_PWM(MOTOR_RIGHT, pwm_value);
     for(int i = 0; i<100; i+=1){
-        l = sprintf(buffer, "%d %d \n",0,mot == MOTOR_LEFT ? velocity_LEFT:velocity_RIGHT);
+        l = sprintf(buffer, "%d %d \n",velocity_LEFT,velocity_RIGHT);
         HAL_UART_Transmit(&huart1, buffer, l, 100);
-        HAL_Delay(2);
+        HAL_Delay(4);
     } 
-    set_PWM(mot, 0);
+    set_PWM(MOTOR_LEFT, 0);
     set_PWM(MOTOR_RIGHT, 0);
 }
-int calc_velocity(uint16_t last_enc_reading, uint16_t enc_reading);
+
+void print_encoders(){
+    int lenght;
+    char buffer[20];
+    lenght = sprintf(buffer, "%d %d\n",ENCODER_LEFT, ENCODER_RIGHT);
+    HAL_UART_Transmit(&huart1, buffer, lenght, 100);
+}
+void pid_left(int error, int point_of_work){
+static int last_point_of_work = 0;
+    static int error_integral = 0;
+    if(last_point_of_work != point_of_work){
+        error_integral = 0;
+        error = 0;
+    }
+    last_point_of_work = point_of_work;
+    error_integral+= error;
+    if(error_integral > 200)error_integral =200;
+    if(error_integral < -200)error_integral = -200;
+    int base_value = point_of_work * 4;
+    float P = 5;
+    float I = 1;
+    set_control(MOTOR_LEFT, base_value + error * P+ error_integral * I);
+}
+void pid_right(int error, int point_of_work){
+    static int last_point_of_work = 0;
+    static int error_integral = 0;
+    if(last_point_of_work != point_of_work){
+        error_integral = 0;
+        error = 0;
+    }
+    last_point_of_work = point_of_work;
+    error_integral+= error;
+    if(error_integral > 200)error_integral =200;
+    if(error_integral < -200)error_integral = -200;
+    int base_value = point_of_work * 4;
+    float P = 5;
+    float I = 1;
+    set_control(MOTOR_RIGHT, base_value + error * P+ error_integral * I);
+}
+int set_velocity_pid(enum Motor mot, int desired_velocity){
+    if(mot == MOTOR_LEFT)pid_left(desired_velocity - velocity_LEFT, desired_velocity);
+    if(mot == MOTOR_RIGHT)pid_right(desired_velocity - velocity_RIGHT, desired_velocity);
+}
