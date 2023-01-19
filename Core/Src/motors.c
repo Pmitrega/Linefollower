@@ -3,8 +3,8 @@
 #include "stdio.h"
 #include "main.h"
 extern UART_HandleTypeDef huart1;
-extern int16_t velocity_LEFT;
-extern int16_t velocity_RIGHT;
+extern int velocity_LEFT;
+extern int velocity_RIGHT;
 int desired_velocity_left;
 int desired_velocity_right;
 int set_PWM(enum Motor mot, uint16_t value){

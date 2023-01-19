@@ -1,5 +1,7 @@
 .vscode/
 build/
+.idea/
+venv/
 /BOARD/*
 !/BOARD/THEBOARD.kicad_pcb
 !/BOARD/THEBOARD.kicad_pro

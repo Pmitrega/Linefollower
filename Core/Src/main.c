@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "motors.h"
 #include "sensors.h"
+#include "uart_handler.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define P_velocity 17
+#define P_velocity 13
 
 /* USER CODE END PD */
 
@@ -58,21 +59,26 @@ UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 int velocity_LEFT;
 int velocity_RIGHT;
+int velocity_ARRAY_LEFT[4] = {0,0,0,0};
+int velocity_ARRAY_RIGHT[4] = {0,0,0,0};
+int flt_cnt = 0;
 extern uint16_t sensor_readings[8];
 int angle = 0;
-int BASE_SPEED = 160;
+int BASE_SPEED = 0;
+extern uint8_t recieve;
+int auto_control_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_DMA_Init(void);
+static void MX_USART1_UART_Init(void);
 static void MX_TIM9_Init(void);
 static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
@@ -81,38 +87,62 @@ static void MX_TIM5_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+int get_average(int* arr,int size){
+  int avr = 0;
+  int div = size;
+  for(int i=0;i<size;i++){
+    if(arr[i]>2000){
+      div--;
+    }
+    else
+      avr+=arr[i];
+  }
+  return avr/div;
+}
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   static uint16_t last_enc_LEFT = 32000;
   static uint16_t last_enc_RIGHT = 32000;
+  static int velocity_LEFT_TMP;
+  static int velocity_RIGHT_TMP;
   if(htim == &htim9){
-    velocity_LEFT = (int)(((int16_t)last_enc_LEFT - ENCODER_LEFT)*CONVERSION_COEFFICIENT);
-    velocity_RIGHT =(int)((-(int16_t)last_enc_RIGHT + ENCODER_RIGHT)*CONVERSION_COEFFICIENT);
+    velocity_LEFT = (int)(((int)last_enc_LEFT - ENCODER_LEFT)*CONVERSION_COEFFICIENT);
+    velocity_RIGHT =(int)((-(int)last_enc_RIGHT + ENCODER_RIGHT)*CONVERSION_COEFFICIENT);
+    // velocity_ARRAY_LEFT[flt_cnt%4] = velocity_LEFT_TMP;
+    // velocity_ARRAY_RIGHT[flt_cnt%4] = velocity_RIGHT_TMP;
+    // velocity_LEFT = get_average(velocity_ARRAY_LEFT, 4);
+    // velocity_RIGHT = get_average(velocity_ARRAY_RIGHT, 4);
+    // velocity_LEFT = velocity_LEFT_TMP;
+    // velocity_LEFT = velocity_RIGHT_TMP;
+    flt_cnt+=1;
     last_enc_LEFT = ENCODER_LEFT;
     last_enc_RIGHT = ENCODER_RIGHT;
   }
   if(htim == &htim5){
+    if(auto_control_flag){
       angle = estimate_angle(sensor_readings);
       set_velocity(MOTOR_LEFT,P_velocity*angle+BASE_SPEED);
       set_velocity(MOTOR_RIGHT, -P_velocity*angle+BASE_SPEED);
+  }
       velocity_pid();
   }
 }
 
 void led_check(){
   HAL_GPIO_WritePin(GPIOB, LED_RED1_Pin,1);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_BLUE1_Pin, 1);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_BLUE2_Pin, 1);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_RED2_Pin, 1);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_RED1_Pin,0);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_BLUE1_Pin, 0);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_BLUE2_Pin, 0);
-  HAL_Delay(500);
+  HAL_Delay(200);
   HAL_GPIO_WritePin(GPIOB, LED_RED2_Pin, 0);
 }
 
@@ -146,13 +176,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART1_UART_Init();
+  MX_DMA_Init();
   MX_TIM10_Init();
   MX_TIM11_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
-  MX_DMA_Init();
   MX_ADC1_Init();
+  MX_USART1_UART_Init();
   MX_TIM9_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
@@ -161,32 +191,33 @@ int main(void)
   HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1);
   TIM3->CNT = 32000;
   TIM4->CNT = 32000;
+  char buffer[30];
+  int l;
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
   HAL_GPIO_WritePin(STBY_GPIO_Port, STBY_Pin, 1);
   HAL_GPIO_WritePin(STBY_GPIO_Port, STBY_Pin, 1);
   led_check();
-  int l;
-  char buffer[45];
-  int angle = 0;
-  int base_speed = 55;
-  int P = 11.6;
+  HAL_UART_Receive_IT(&huart1, &recieve, 1);
   HAL_ADC_Start_DMA(&hadc1,  (uint32_t *)sensor_readings, 8);
-        while(!HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin)){
-
-      }
+  HAL_Delay(200);
   HAL_TIM_Base_Start_IT(&htim5);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {   
-
-      l = sprintf(buffer, "%d %d %d %d %d %d %d %d\n",sensor_readings[0],sensor_readings[1],sensor_readings[2],sensor_readings[3],sensor_readings[4],sensor_readings[5],sensor_readings[6],sensor_readings[7]);
-      //l = sprintf(buffer, "%d\n", angle);
-      HAL_UART_Transmit(&huart1, buffer, l, 100);
-      HAL_Delay(10);
+      HAL_Delay(300);
+      if(HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin)){
+        auto_control_flag = 1;
+        BASE_SPEED = 120;
+      }
+      //l = sprintf(buffer, "%d %d %d %d %d %d %d %d\n",sensor_readings[0],sensor_readings[1],sensor_readings[2],sensor_readings[3],sensor_readings[4],sensor_readings[5],sensor_readings[6],sensor_readings[7]);
+      // l = sprintf(buffer, "%d %d %d\n", velocity_LEFT, velocity_RIGHT, estimate_angle(sensor_readings));
+      // HAL_UART_Transmit(&huart1, buffer, l, 100);
+      //HAL_Delay(3);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
